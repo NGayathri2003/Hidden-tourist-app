@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "@/contexts/UserContext";
 import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,22 +9,49 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CreditCard, Building, Smartphone, Lock, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 
 const Payment = () => {
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useUser();
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [countdown, setCountdown] = useState(10);
+  const [bookingId, setBookingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast.error("Please login to continue");
+      navigate("/auth");
+      return;
+    }
+
+    // Get booking ID from sessionStorage
+    const storedBookingId = sessionStorage.getItem("currentBookingId");
+    if (!storedBookingId) {
+      toast.error("No booking found. Please start booking again.");
+      navigate("/booking");
+      return;
+    }
+    setBookingId(storedBookingId);
+  }, [isAuthenticated, navigate]);
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!bookingId) {
+      toast.error("Booking information missing");
+      return;
+    }
+
     setIsProcessing(true);
     setCountdown(10);
   
     const paymentData = {
+      bookingId,
       paymentMethod,
-      amount: 27610,
+      amount: 14299,
     };
   
     try {
@@ -35,11 +63,18 @@ const Payment = () => {
   
       const result = await response.json();
       console.log("✅ Payment Response:", result);
+      
+      if (response.ok) {
+        // Clear booking ID from sessionStorage
+        sessionStorage.removeItem("currentBookingId");
+      }
     } catch (error) {
       console.error("❌ Payment Error:", error);
+      toast.error("Payment processing failed");
+      setIsProcessing(false);
+      setCountdown(0);
     }
   };
-  
 
   useEffect(() => {
     if (isProcessing && countdown > 0) {
@@ -50,12 +85,15 @@ const Payment = () => {
     } else if (isProcessing && countdown === 0) {
       setIsProcessing(false);
       setShowSuccess(true);
-      // Redirect to home after 3 seconds
       setTimeout(() => {
-        navigate("/");
+        navigate("/booking-history");
       }, 3000);
     }
   }, [isProcessing, countdown, navigate]);
+
+  if (!isAuthenticated || !bookingId) {
+    return null;
+  }
 
   // Show success overlay
   if (showSuccess) {
@@ -72,7 +110,7 @@ const Payment = () => {
             Your booking has been confirmed
           </p>
           <p className="text-sm text-muted-foreground">
-            Redirecting to home page...
+            Redirecting to booking history...
           </p>
         </div>
       </div>
@@ -252,29 +290,21 @@ const Payment = () => {
                       <p className="font-semibold text-foreground">Coastal Heritage Trail</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Travelers</p>
-                      <p className="font-semibold text-foreground">2 Adults</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Travel Date</p>
-                      <p className="font-semibold text-foreground">March 15, 2025</p>
+                      <p className="text-sm text-muted-foreground mb-1">Duration</p>
+                      <p className="font-semibold text-foreground">5 Days / 4 Nights</p>
                     </div>
                     <div className="pt-4 border-t border-border">
                       <div className="flex justify-between mb-2">
-                        <span className="text-muted-foreground">Subtotal</span>
-                        <span className="font-semibold">₹25,998</span>
+                        <span className="text-muted-foreground">Base Price</span>
+                        <span className="font-semibold">₹12,999</span>
                       </div>
                       <div className="flex justify-between mb-2">
-                        <span className="text-muted-foreground">Discount</span>
-                        <span className="font-semibold text-accent">-₹2,600</span>
-                      </div>
-                      <div className="flex justify-between mb-2">
-                        <span className="text-muted-foreground">GST (18%)</span>
-                        <span className="font-semibold">₹4,212</span>
+                        <span className="text-muted-foreground">Taxes & Fees</span>
+                        <span className="font-semibold">₹1,300</span>
                       </div>
                       <div className="flex justify-between pt-2 border-t border-border">
-                        <span className="font-semibold text-foreground">Total Amount</span>
-                        <span className="text-2xl font-bold text-primary">₹27,610</span>
+                        <span className="font-semibold text-foreground">Total</span>
+                        <span className="text-2xl font-bold text-primary">₹14,299</span>
                       </div>
                     </div>
                   </CardContent>

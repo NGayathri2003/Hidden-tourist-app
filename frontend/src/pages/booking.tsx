@@ -1,6 +1,7 @@
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "@/contexts/UserContext";
 import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,24 +12,52 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon, Users, Phone, Mail } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 const Booking = () => {
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useUser();
   const [date, setDate] = useState<Date>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast.error("Please login to book a package");
+      navigate("/auth");
+    }
+  }, [isAuthenticated, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    console.log("🔍 Current user object:", user);
+    
+    if (!user) {
+      console.error("❌ userId is missing from user object!");
+      toast.error("Session error. Please login again.");
+      navigate("/auth");
+      return;
+    }
+
+    if (!date) {
+      toast.error("Please select a travel date");
+      return;
+    }
+
     setIsSubmitting(true);
   
     const bookingData = {
+      userId: user.userId,
       firstName: (document.getElementById("firstName") as HTMLInputElement).value,
       lastName: (document.getElementById("lastName") as HTMLInputElement).value,
       email: (document.getElementById("email") as HTMLInputElement).value,
       phone: (document.getElementById("phone") as HTMLInputElement).value,
-      date: date ? date.toISOString() : null,
-      travelers: (document.getElementById("travelers") as HTMLInputElement).value,
+      date: date.toISOString(),
+      travelers: parseInt((document.getElementById("travelers") as HTMLInputElement).value),
       specialRequests: (document.getElementById("specialRequests") as HTMLTextAreaElement).value,
+      packageName: "Coastal Heritage Trail",
+      totalAmount: 14299,
+      status: "booked"
     };
   
     try {
@@ -43,19 +72,28 @@ const Booking = () => {
       if (response.ok) {
         const result = await response.json();
         console.log("✅ Booking saved:", result);
+        
+        // Store booking ID in sessionStorage to use in payment page
+        sessionStorage.setItem("currentBookingId", result.booking._id);
+        
+        toast.success("Booking details saved!");
         navigate("/payment");
       } else {
-        console.error("❌ Failed to save booking:", response.statusText);
-        alert("Booking failed. Please try again!");
+        const error = await response.json();
+        console.error("❌ Failed to save booking:", error);
+        toast.error(error.message || "Booking failed. Please try again!");
       }
     } catch (error) {
       console.error("❌ Error while booking:", error);
-      alert("Something went wrong. Try again later!");
+      toast.error("Something went wrong. Try again later!");
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -107,6 +145,7 @@ const Booking = () => {
                               type="email"
                               placeholder="john@example.com"
                               className="pl-10"
+                              defaultValue={user?.email}
                               required
                             />
                           </div>
@@ -144,7 +183,12 @@ const Booking = () => {
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
-                              <Calendar mode="single" selected={date} onSelect={setDate} />
+                              <Calendar 
+                                mode="single" 
+                                selected={date} 
+                                onSelect={setDate}
+                                disabled={(date) => date < new Date()}
+                              />
                             </PopoverContent>
                           </Popover>
                         </div>

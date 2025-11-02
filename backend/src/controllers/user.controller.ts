@@ -3,48 +3,65 @@ import { User } from '../models/user.model';
 
 export async function createUser(req: Request, res: Response) {
 	try {
+		console.log("=== 📝 SIGNUP REQUEST RECEIVED ===");
+		console.log("Request body:", req.body);
+		
 		const { fullName, email, password } = req.body;
-		console.log("Name",fullName,"Email",email,"Password",password)
-		// Validate required fields
-		if (!fullName || !email || !password ) {
+		
+		if (!fullName || !email || !password) {
+			console.log("❌ Missing required fields");
 			return res.status(400).json({ 
 				message: 'Full name, email, password are required' 
 			});
 		}
-		
 
-
-		// Validate password length
 		if (password.length < 6) {
+			console.log("❌ Password too short");
 			return res.status(400).json({ 
 				message: 'Password must be at least 6 characters' 
 			});
 		}
 
-		// Check if email already exists
+		console.log("Checking for existing user with email:", email);
 		const existing = await User.findOne({ email });
+		
 		if (existing) {
+			console.log("❌ Email already exists:", email);
 			return res.status(409).json({ message: 'Email already registered' });
 		}
-
+		
+		console.log("Creating new user...");
 		const user = await User.create({ fullName, email, password });
 		
-		// Return user without password
-		const userWithoutPassword = user.toObject();
-		const { password: _, ...userResponse } = userWithoutPassword;
+		console.log("✅ User created successfully:", user.userId);
+		
+		const userResponse = {
+			_id: user._id,
+			userId: user.userId,
+			fullName: user.fullName,
+			email: user.email
+		};
 		
 		return res.status(201).json({ 
 			message: 'User created successfully', 
 			user: userResponse 
 		});
-	} catch (error) {
-		console.error('Error creating user:', error);
-		return res.status(500).json({ message: 'Failed to create user' });
+		
+	} catch (error: any) {
+		console.error('❌❌❌ SIGNUP ERROR ❌❌❌');
+		console.error('Error:', error);
+		return res.status(500).json({ 
+			message: 'Failed to create user',
+			error: error.message 
+		});
 	}
 }
 
 export async function signIn(req: Request, res: Response) {
 	try {
+		console.log("=== 🔐 SIGNIN REQUEST RECEIVED ===");
+		console.log("Request body:", req.body);
+		
 		const { email, password } = req.body;
 		
 		if (!email || !password) {
@@ -56,79 +73,34 @@ export async function signIn(req: Request, res: Response) {
 		const user = await User.findOne({ email });
 		
 		if (!user) {
+			console.log("❌ User not found:", email);
 			return res.status(401).json({ message: 'Invalid credentials' });
 		}
 
-		// For now, simple password comparison (you should hash passwords)
 		if (user.password !== password) {
+			console.log("❌ Invalid password for:", email);
 			return res.status(401).json({ message: 'Invalid credentials' });
 		}
 
-		// Return user without password
-		const userWithoutPassword = user.toObject();
-		const { password: _, ...userResponse } = userWithoutPassword;
+		console.log("✅ Login successful:", user.userId);
+
+		const userResponse = {
+			_id: user._id,
+			userId: user.userId,
+			fullName: user.fullName,
+			email: user.email
+		};
 
 		return res.json({ 
 			message: 'Sign in successful', 
 			user: userResponse 
 		});
-	} catch (error) {
-		console.error('Error signing in:', error);
-		return res.status(500).json({ message: 'Failed to sign in' });
+		
+	} catch (error: any) {
+		console.error('❌ Error signing in:', error);
+		return res.status(500).json({ 
+			message: 'Failed to sign in',
+			error: error.message 
+		});
 	}
 }
-
-export async function getUsers(_req: Request, res: Response) {
-	try {
-		const users = await User.find().select('-password');
-		return res.json(users);
-	} catch (error) {
-		return res.status(500).json({ message: 'Failed to fetch users' });
-	}
-}
-
-export async function getUserById(req: Request, res: Response) {
-	try {
-		const { id } = req.params;
-		const user = await User.findById(id).select('-password');
-		if (!user) {
-			return res.status(404).json({ message: 'User not found' });
-		}
-		return res.json(user);
-	} catch (error) {
-		return res.status(500).json({ message: 'Failed to fetch user' });
-	}
-}
-
-export async function updateUser(req: Request, res: Response) {
-	try {
-		const { id } = req.params;
-		const { fullName, email, password } = req.body;
-		const user = await User.findByIdAndUpdate(
-			id,
-			{ fullName, email, password },
-			{ new: true, runValidators: true }
-		).select('-password');
-		if (!user) {
-			return res.status(404).json({ message: 'User not found' });
-		}
-		return res.json(user);
-	} catch (error) {
-		return res.status(500).json({ message: 'Failed to update user' });
-	}
-}
-
-export async function deleteUser(req: Request, res: Response) {
-	try {
-		const { id } = req.params;
-		const user = await User.findByIdAndDelete(id).select('-password');
-		if (!user) {
-			return res.status(404).json({ message: 'User not found' });
-		}
-		return res.status(204).send();
-	} catch (error) {
-		return res.status(500).json({ message: 'Failed to delete user' });
-	}
-}
-
-

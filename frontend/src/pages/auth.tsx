@@ -1,5 +1,7 @@
 import * as React from "react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useUser } from "@/contexts/UserContext";  // ✅ ADD THIS IMPORT
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,18 +9,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "@/components/ui/sonner";
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { setUser } = useUser();  // ✅ ADD THIS LINE
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-  
-    // Collect form data from inputs
+
     const email = (document.getElementById("signin-email") as HTMLInputElement).value;
     const password = (document.getElementById("signin-password") as HTMLInputElement).value;
-  
+
     try {
       const response = await fetch("http://localhost:5000/api/users/signin", {
         method: "POST",
@@ -27,41 +31,52 @@ const Auth = () => {
         },
         body: JSON.stringify({ email, password }),
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json();
-        alert(`Error: ${errorData.message}`);
+        toast.error(errorData.message || "Sign-in failed");
       } else {
         const data = await response.json();
-        console.log("✅ Sign-in successful:", data);
-        alert("Sign-in successful!");
-  
-        // Optional: store user info in localStorage
-        localStorage.setItem("user", JSON.stringify(data.user));
-  
-        // Redirect to another page if needed
-        // navigate("/home");  <-- only if you’re using react-router
+        console.log("✅ Sign-in response:", data);
+        
+        if (!data.user.userId) {
+          console.error("❌ userId is missing from response!");
+          toast.error("Login error: User data incomplete");
+          return;
+        }
+        
+        // ✅ Update UserContext - THIS IS IMPORTANT!
+        setUser(data.user);
+        
+        toast.success("Sign-in successful!");
+        
+        // ✅ Use navigate instead of window.location.href
+        navigate("/");
       }
     } catch (error) {
       console.error("Sign-in failed:", error);
-      alert("Something went wrong! Please try again.");
+      toast.error("Something went wrong! Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
   
-
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
   
     try {
-      // Collect form data
       const fullName = (document.getElementById('signup-name') as HTMLInputElement).value;
       const email = (document.getElementById('signup-email') as HTMLInputElement).value;
       const password = (document.getElementById('signup-password') as HTMLInputElement).value;
+      const confirmPassword = (document.getElementById('signup-confirm') as HTMLInputElement).value;
+
+      if (password !== confirmPassword) {
+        toast.error("Passwords do not match!");
+        setIsLoading(false);
+        return;
+      }
   
-      // Call backend API
       const response = await fetch('http://localhost:5000/api/users/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -71,19 +86,19 @@ const Auth = () => {
       const data = await response.json();
   
       if (response.ok) {
-        alert('✅ Signup successful!');
-        console.log('User created:', data);
+        toast.success('Signup successful! Please sign in.');
+        // Switch to signin tab
+        (document.querySelector('[value="signin"]') as HTMLElement)?.click();
       } else {
-        alert(`❌ Signup failed: ${data.message}`);
+        toast.error(data.message || "Signup failed");
       }
     } catch (err) {
       console.error('Signup error:', err);
-      alert('⚠️ Network or server error');
+      toast.error('Network or server error');
     } finally {
       setIsLoading(false);
     }
   };
-  
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/10 via-secondary/10 to-accent/10">

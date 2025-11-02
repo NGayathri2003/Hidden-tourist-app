@@ -9,7 +9,7 @@ export const createPayment = async (req: Request, res: Response) => {
   try {
     const { bookingId, paymentMethod, amount } = req.body;
 
-    if (!paymentMethod || !amount) {
+    if (!bookingId || !paymentMethod || !amount) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
@@ -18,7 +18,7 @@ export const createPayment = async (req: Request, res: Response) => {
       paymentMethod,
       amount,
       transactionId: uuidv4(),
-      status: "Success", // assuming successful for now
+      status: "Success",
     });
 
     res.status(201).json({
